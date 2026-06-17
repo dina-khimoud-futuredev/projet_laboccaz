@@ -138,5 +138,4 @@ PATCH /api/quotes/1780406639064x759129524280623700/status?status=IN_REVIEW
 ---
 
 ## Auteur
-
 Projet réalisé dans le cadre du projet Laboccaz.

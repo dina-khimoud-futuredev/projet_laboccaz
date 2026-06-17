@@ -23,4 +23,8 @@ public class QuoteRequestCreateDto {
     private String bubbleArticleId;
     private String productName;
     private Double unitPriceHt;
+
+
+
+    
 }
