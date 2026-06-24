@@ -42,13 +42,28 @@ public class QuoteRequest {
 
     private LocalDateTime updatedAt;
 
-
-
     private String productName;
     private Double unitPriceHt;
 
+    // Expiration : 1 semaine après creation
+    private LocalDateTime expiresAt;
 
-  
+    // Archivage
+    @Enumerated(EnumType.STRING)
+    private ArchiveReason archiveReason;
 
-   
+    @Column(columnDefinition = "TEXT")
+    private String archiveReasonCustom;
+
+    private LocalDateTime archivedAt;
+
+    // Refus
+    @Enumerated(EnumType.STRING)
+    private RefusalReason refusalReason;
+
+    @Column(columnDefinition = "TEXT")
+    private String refusalReasonCustom;
+
+    private LocalDateTime refusedAt;
+
 }

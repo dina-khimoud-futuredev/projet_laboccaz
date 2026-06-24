@@ -1,5 +1,7 @@
 package com.laboccaz.devis.dto;
 
+import com.laboccaz.devis.entity.ArchiveReason;
+
 import lombok.Getter;
 import lombok.Setter;
 
@@ -24,7 +26,14 @@ public class QuoteRequestCreateDto {
     private String productName;
     private Double unitPriceHt;
 
+    // Archivage
+    private ArchiveReason archiveReason;
+    private String archiveReasonCustom;
+
+    private Boolean createdFromBackend;
+    private String createdByAdminName;
 
 
     
+
 }

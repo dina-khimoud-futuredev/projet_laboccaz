@@ -1,5 +1,7 @@
 package com.laboccaz.devis.service;
 
+import com.laboccaz.devis.dto.LotLineDto;
+import com.laboccaz.devis.dto.LotQuoteCreateDto;
 import com.laboccaz.devis.dto.QuoteRequestCreateDto;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -8,13 +10,11 @@ import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.http.*;
 
 import java.net.URI;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
-
+import java.util.List;
 
 @Service
 public class BubbleApiService {
@@ -94,6 +94,9 @@ public class BubbleApiService {
                 body.put("source", dto.getSource());
                 body.put("crm_sync_status", "PENDING");
                 body.put("created_from_backend", true);
+
+                body.put("created_from_backend", dto.getCreatedFromBackend());
+                body.put("created_by_admin_name", dto.getCreatedByAdminName());
 
                 HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
 
@@ -535,4 +538,158 @@ public class BubbleApiService {
                 return (Map<String, Object>) response.getBody().get("response");
         }
 
+        /**
+         * Patch partiel d'une demande Bubble : GET complet → merge des champs → PUT.
+         * Utilisé pour l'archivage (status + motifs) sans écraser les autres champs.
+         */
+        public String patchQuoteFields(String id, Map<String, Object> fields) {
+                String url = bubbleBaseUrl + "/Demande_devis/" + id;
+
+                RestTemplate restTemplate = new RestTemplate();
+
+                HttpHeaders headers = new HttpHeaders();
+                headers.setBearerAuth(bubbleApiToken);
+                headers.setContentType(MediaType.APPLICATION_JSON);
+
+                // 1. Récupérer l'objet complet depuis Bubble
+                HttpEntity<String> getEntity = new HttpEntity<>(headers);
+                ResponseEntity<Map> getResponse = restTemplate.exchange(
+                                url, HttpMethod.GET, getEntity, Map.class);
+
+                Map<String, Object> currentBody = getResponse.getBody();
+                Map<String, Object> responseMap = new java.util.LinkedHashMap<>(
+                                (Map<String, Object>) currentBody.get("response"));
+
+                // 2. Appliquer les champs à modifier
+                responseMap.putAll(fields);
+
+                // 3. Supprimer les champs système Bubble
+                responseMap.remove("_id");
+                responseMap.remove("Created Date");
+                responseMap.remove("Modified Date");
+                responseMap.remove("Created By");
+
+                // 4. Remettre l'objet complet via PUT
+                HttpEntity<Map<String, Object>> putEntity = new HttpEntity<>(responseMap, headers);
+                ResponseEntity<String> response = restTemplate.exchange(
+                                url, HttpMethod.PUT, putEntity, String.class);
+
+                return response.getBody();
+        }
+
+        public String createLotQuote(LotQuoteCreateDto dto) {
+                RestTemplate restTemplate = new RestTemplate();
+                HttpHeaders headers = new HttpHeaders();
+                headers.setBearerAuth(bubbleApiToken);
+                headers.setContentType(MediaType.APPLICATION_JSON);
+
+                // ── ÉTAPE 1 : Créer la Commande sans les lots ──
+                Map<String, Object> commandeBody = new HashMap<>();
+                commandeBody.put("Statut", "Demande envoyée");
+
+                if (dto.getTotalTtc() != null)
+                        commandeBody.put("Total", dto.getTotalTtc());
+                if (dto.getTva() != null)
+                        commandeBody.put("tva", dto.getTva());
+                if (dto.getVendeur() != null)
+                        commandeBody.put("Vendeur", dto.getVendeur());
+
+                System.out.println("=== ÉTAPE 1 : Création Commande ===");
+                System.out.println("COMMANDE BODY = " + commandeBody);
+
+                HttpEntity<Map<String, Object>> createEntity = new HttpEntity<>(commandeBody, headers);
+
+                ResponseEntity<Map> createResponse = restTemplate.exchange(
+                                bubbleBaseUrl + "/Commande",
+                                HttpMethod.POST,
+                                createEntity,
+                                Map.class);
+
+                String commandeId = createResponse.getBody().get("id").toString();
+                System.out.println("Commande créée avec ID = " + commandeId);
+
+                // ── ÉTAPE 2 : Créer chaque article_quantité_lot ──
+                List<String> lotIds = new ArrayList<>();
+                List<String> lotAvecQuantiIds = new ArrayList<>();
+
+                System.out.println("=== ÉTAPE 2 : Création des lots ===");
+                System.out.println("Nombre de lignes = " + (dto.getLines() != null ? dto.getLines().size() : 0));
+
+                if (dto.getLines() != null) {
+                        for (LotLineDto line : dto.getLines()) {
+
+                                System.out.println("--- Ligne article : " + line.getArticleId());
+
+                                if (line.getArticleId() != null && !line.getArticleId().isBlank()) {
+                                        lotIds.add(line.getArticleId());
+                                }
+
+                                Double totalHtLigne = null;
+                                if (line.getUnitPriceHt() != null && line.getQuantity() != null) {
+                                        totalHtLigne = line.getUnitPriceHt() * line.getQuantity();
+                                }
+
+                                Map<String, Object> lotBody = new HashMap<>();
+                                lotBody.put("Article", line.getArticleId());
+                                lotBody.put("Commande", commandeId);
+                                lotBody.put("Quantit\u00E9", line.getQuantity());
+                                if (totalHtLigne != null)
+                                        lotBody.put("Total HT", totalHtLigne);
+
+                                URI lotUri;
+                                try {
+                                        lotUri = new URI(bubbleBaseUrl + "/article_quantit%C3%A9_lot");
+                                } catch (java.net.URISyntaxException e) {
+                                        throw new RuntimeException("URI invalide", e);
+                                }
+
+                                System.out.println("LOT URI = " + lotUri);
+                                System.out.println("LOT BODY = " + lotBody);
+
+                                HttpEntity<Map<String, Object>> lotEntity = new HttpEntity<>(lotBody, headers);
+
+                                try {
+                                        ResponseEntity<Map> lotResponse = restTemplate.exchange(
+                                                        lotUri,
+                                                        HttpMethod.POST,
+                                                        lotEntity,
+                                                        Map.class);
+
+                                        String lotQuantiId = lotResponse.getBody().get("id").toString();
+                                        lotAvecQuantiIds.add(lotQuantiId);
+                                        System.out.println("article_quantité_lot créé avec ID = " + lotQuantiId);
+
+                                } catch (org.springframework.web.client.HttpClientErrorException e) {
+                                        System.out.println(
+                                                        "Erreur création lot ligne : " + e.getResponseBodyAsString());
+                                        System.out.println("Erreur status : " + e.getStatusCode());
+                                        throw e;
+                                }
+                        }
+                }
+
+                // ── ÉTAPE 3 : Patch la Commande ──
+                Map<String, Object> patchBody = new HashMap<>();
+                if (!lotIds.isEmpty())
+                        patchBody.put("Lot", lotIds);
+                if (!lotAvecQuantiIds.isEmpty())
+                        patchBody.put("Lot_avec_quantit\u00E9", lotAvecQuantiIds);
+
+                System.out.println("PATCH BODY = " + patchBody);
+
+                HttpEntity<Map<String, Object>> patchEntity = new HttpEntity<>(patchBody, headers);
+
+                // RestTemplate spécial qui supporte PATCH
+                org.springframework.http.client.HttpComponentsClientHttpRequestFactory factory = new org.springframework.http.client.HttpComponentsClientHttpRequestFactory();
+                RestTemplate patchRestTemplate = new RestTemplate(factory);
+
+                ResponseEntity<String> patchResponse = patchRestTemplate.exchange(
+                                bubbleBaseUrl + "/Commande/" + commandeId,
+                                HttpMethod.PATCH,
+                                patchEntity,
+                                String.class);
+
+                System.out.println("Commande patchée = " + patchResponse.getBody());
+                return patchResponse.getBody();
+        }
 }

@@ -6,5 +6,7 @@ public enum QuoteStatus {
     QUOTE_GENERATED,
     QUOTE_SENT,
     ACCEPTED,
-    REJECTED
+    REJECTED,
+    EXPIRED,
+    ARCHIVED
 }

@@ -1,8 +1,11 @@
 package com.laboccaz.devis.controller;
 
+import com.laboccaz.devis.dto.ArchiveQuoteDto;
 import com.laboccaz.devis.dto.QuoteRequestCreateDto;
 import com.laboccaz.devis.service.QuoteRequestService;
 import org.springframework.web.bind.annotation.*;
+
+import com.laboccaz.devis.dto.RejectQuoteDto;
 
 @RestController
 @RequestMapping("/api/quotes")
@@ -50,7 +53,24 @@ public class QuoteRequestController {
         return service.updateQuoteRequest(id, dto);
     }
 
+    /**
+     * Archivage avec motif obligatoire (prédéfini ou libre).
+     * POST /api/quotes/{id}/archive
+     * Body : { "archiveReason": "CONCURRENT_CHOISI", "archiveReasonCustom": "" }
+     * ou { "archiveReason": "AUTRE", "archiveReasonCustom": "Mon motif
+     * personnalisé" }
+     */
+    @PostMapping("/{id}/archive")
+    public String archiveQuote(
+            @PathVariable String id,
+            @RequestBody ArchiveQuoteDto dto) {
+        return service.archiveQuote(id, dto);
+    }
 
-    
-
+    @PostMapping("/{id}/reject")
+    public String rejectQuote(
+            @PathVariable String id,
+            @RequestBody RejectQuoteDto dto) {
+        return service.rejectQuote(id, dto);
+    }
 }
