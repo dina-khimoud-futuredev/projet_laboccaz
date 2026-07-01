@@ -13,6 +13,7 @@ public class LotQuoteCreateDto {
     private String clientEmail;
     private String clientPhone;
     private String companyName;
+    private String bubbleClientId;
 
     // Lot
     private String lotReference;

@@ -33,6 +33,8 @@ public class QuoteRequestCreateDto {
     private Boolean createdFromBackend;
     private String createdByAdminName;
 
+    private String clientAddress;
+
 
     
 

@@ -76,7 +76,8 @@ public class ClientService {
                 dto.getClientName(),
                 dto.getClientEmail(),
                 dto.getClientPhone(),
-                dto.getCompanyName());
+                dto.getCompanyName(),
+                dto.getClientAddress());
 
         return upsertFromBubbleExternalClient(createdExternalClient);
     }
@@ -102,8 +103,6 @@ public class ClientService {
 
         return null;
     }
-
-    
 
     private Client upsertFromBubbleUser(Map<String, Object> bubbleUser) {
         String bubbleUserId = getString(bubbleUser, "_id");
@@ -185,14 +184,11 @@ public class ClientService {
         client.setFullName(getString(externalClient, "full_name"));
         client.setCompanyName(companyName);
         client.setPhone(getString(externalClient, "phone"));
-        client.setAddress(getString(externalClient, "adresse"));
+        client.setAddress(getString(externalClient, "Adresse"));
         client.setUpdatedAt(LocalDateTime.now());
 
         return clientRepository.save(client);
     }
-
-
-
 
     private String extractEmail(Map<String, Object> bubbleUser) {
         String emailText = getString(bubbleUser, "email_text");
@@ -216,9 +212,6 @@ public class ClientService {
         return null;
     }
 
-
-
-
     private String extractAddress(Map<String, Object> bubbleUser) {
         Object addressObject = bubbleUser.get("Adresse");
 
@@ -230,17 +223,10 @@ public class ClientService {
         return null;
     }
 
-
-
-
     private String getString(Map<String, Object> map, String key) {
         Object value = map.get(key);
         return value == null ? null : value.toString();
     }
-
-
-
-
 
     private Boolean getBoolean(Map<String, Object> map, String key) {
         Object value = map.get(key);
@@ -251,10 +237,6 @@ public class ClientService {
 
         return null;
     }
-
-
-
-
 
     private String firstNotBlank(String first, String second) {
         if (first != null && !first.isBlank()) {
@@ -267,9 +249,6 @@ public class ClientService {
 
         return null;
     }
-
-
-
 
     public Client searchExternalClient(String query) {
 
